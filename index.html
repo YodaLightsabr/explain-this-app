@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explain This</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Explain This</h1>
+    <p>Use Wikipedia and a dictionary to explain something.</p>
+    <label for="search">Search term </label>
+    <input name="search" placeholder="Jeff Bezos" id="search" onkeypress="key(event);" value="" />
+    <br />
+    <label for="context">Context (optional)</label>
+    <textarea id="context" placeholder="Context to determine the correct article. Seperated by newlines." style="height: 100px;"></textarea>
+    <br />
+    <button onclick="search();">Search</button>
+        
+    <br />
+    <br />
+    
+    <h1 id="type"></h1>
+    <div class="results hidden">
+        <h2 id="title"></h2>
+        <p id="body"></p>
+
+        <div id="other" class="hidden">
+            <h1>Other Results</h1>
+        </div>
+
+        <br />
+        <br />
+
+        <h1>Raw Code</h1>
+        <pre><code id="code"></code></pre>
+
+        <h2>API Call</h2>
+        <a id="api-url" target="_blank"><pre><code id="api"></code></pre></a>
+    </div>
+    <script>
+        document.getElementById('search').value = '';
+        document.getElementById('context').value = '';
+        function getId () {
+            return `${Date.now().toString(36)}${Math.random().toString(36).substring(3, 10)}`;
+        }
+        async function search () {
+            if (!document.getElementById('other').classList.contains('hidden')) document.getElementById('other').classList.add('hidden');
+            document.getElementById('type').innerText = 'Results';
+            const query = document.getElementById('search').value;
+            const context = document.getElementById('context').value ? document.getElementById('context').value.split('\n').map(item => encodeURIComponent(item)).join('|') : '';
+            if (document.querySelector('.results.hidden')) document.querySelector('.results.hidden').classList.remove('hidden');
+            document.getElementById('title').innerText = 'Loading...';
+            document.getElementById('body').innerText = 'Loading...';
+            let url = 'https://api.yodacode.xyz/explain/' + query + (context ? '?context=' + context : '');
+            let res;
+            let json;
+            try {
+                res = await fetch(url);
+                json = await res.json();
+            } catch (err) {
+                document.getElementById('type').innerText = 'Error. Try again.';
+                return;
+            }
+            document.getElementById('api').innerText = url;
+            document.getElementById('api-url').href = url;
+            const title = json?.expanded?.topResult?.title ?? (json?.expanded?.word + ` (${json?.expanded?.category})`);
+            document.getElementById('type').innerText = json.type === 'wikipedia' ? 'Top Result' : 'Definition';
+            document.getElementById('title').innerText = title;
+            document.getElementById('body').innerText = json.value;
+            document.getElementById('code').innerText = JSON.stringify(json, null, 4);
+            if (json.type === 'wikipedia' && json.expanded.allResults.length > 1) {
+                if (document.getElementById('other').classList.contains('hidden')) document.getElementById('other').classList.remove('hidden');
+                let titleids = [];
+                let pids = [];
+                let other = document.getElementById('other');
+                other.innerHTML = /*html*/`
+                    <h1>Other Results</h1>
+                    ${json.expanded.allResults.slice(1).map(item => {
+                        let pid = getId();
+                        let titleid = getId();
+                        pids.push(pid);
+                        titleids.push(titleid);
+                        return/*html*/`
+                            <h2 id="${titleid}"></h2>
+                            <p id="${pid}"></p>
+                        `;
+                    }).join('')}
+                `;
+                json.expanded.allResults.slice(1).forEach((item, i) => {
+                    let pid = pids[i];
+                    let titleid = titleids[i];
+                    document.getElementById(pid).innerText = item.blurb;
+                    document.getElementById(titleid).innerText = item.title;
+                });
+            } else {
+                if (!document.getElementById('other').classList.contains('hidden')) document.getElementById('other').classList.add('hidden');
+            }
+        }
+        function key ({ key }) {
+            if (key === 'Enter') search();
+        } 
+    </script>
+</body>
+</html>
